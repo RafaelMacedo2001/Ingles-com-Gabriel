@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rename } from "node:fs/promises";
+import { cp, mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 const projectRoot = process.cwd();
@@ -12,4 +12,4 @@ for (const entry of await readdir(serverDir)) {
   await cp(join(serverDir, entry), join(clientDir, entry), { recursive: true, force: true });
 }
 
-await rename(join(clientDir, "index.js"), join(clientDir, "_worker.js"));
+await cp(join(clientDir, "index.js"), join(clientDir, "_worker.js"), { force: true });
