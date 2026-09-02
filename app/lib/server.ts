@@ -95,14 +95,15 @@ export async function readSession(request: Request): Promise<Session | null> {
 }
 
 export async function hashPassword(password: string) {
+  const iterations = 100_000;
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
   const hash = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 120_000 },
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
     key,
     256,
   );
-  return `v1.120000.${bytesToBase64Url(salt)}.${bytesToBase64Url(new Uint8Array(hash))}`;
+  return `v1.${iterations}.${bytesToBase64Url(salt)}.${bytesToBase64Url(new Uint8Array(hash))}`;
 }
 
 export async function verifyPassword(password: string, encoded: string) {
