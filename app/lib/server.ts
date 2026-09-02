@@ -16,6 +16,7 @@ type RuntimeEnv = {
   COURSE_CHECKOUT_TITLE?: string;
   COURSE_CHECKOUT_PRICE?: string;
   CRON_SECRET?: string;
+  MANUAL_ACCOUNT_SECRET?: string;
   APP_URL?: string;
 };
 
@@ -120,6 +121,20 @@ export async function verifyPassword(password: string, encoded: string) {
   return mismatch === 0;
 }
 
+export function normalizePhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
+  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return `+${digits}`;
+  return digits.length >= 10 && digits.length <= 15 ? `+${digits}` : "";
+}
+
+export function oneYearFromNow() {
+  const expiresAt = new Date();
+  expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);
+  expiresAt.setUTCHours(23, 59, 59, 0);
+  return expiresAt.toISOString();
+}
+
 export async function ensureDatabase() {
   if (!runtime.DB) throw new Error("Banco de dados não configurado.");
   await runtime.DB.batch([
@@ -131,6 +146,15 @@ export async function ensureDatabase() {
       password_hash TEXT,
       expires_at TEXT NOT NULL,
       renewal_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_access_at TEXT
+    )`),
+    runtime.DB.prepare(`CREATE TABLE IF NOT EXISTS admins (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      phone TEXT NOT NULL DEFAULT '',
+      password_hash TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       last_access_at TEXT
     )`),
@@ -222,6 +246,7 @@ export async function ensureDatabase() {
       meta_value TEXT NOT NULL
     )`),
     runtime.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email ON students(email)"),
+    runtime.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_email ON admins(email)"),
     runtime.DB.prepare("CREATE INDEX IF NOT EXISTS idx_students_expires_at ON students(expires_at)"),
     runtime.DB.prepare("CREATE INDEX IF NOT EXISTS idx_access_events_accessed_at ON access_events(accessed_at)"),
     runtime.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_lesson_progress_student_lesson ON lesson_progress(student_id, lesson_id)"),

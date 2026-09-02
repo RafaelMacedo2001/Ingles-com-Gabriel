@@ -485,12 +485,12 @@ export default function Home() {
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/auth/activate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: activationEmail, password }) });
-      const data = await response.json() as { error?: string; name?: string; email?: string; expiresAt?: string };
+      const data = await response.json() as { role?: View; error?: string; name?: string; email?: string; expiresAt?: string };
       if (!response.ok) throw new Error(data.error);
       resetSessionUi();
       if (data.name && data.email && data.expiresAt) setCurrentUser({ name: data.name, email: data.email, expiresAt: data.expiresAt });
       window.history.replaceState({}, "", "/");
-      setView("student");
+      setView(data.role === "admin" ? "admin" : "student");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Não foi possível criar sua senha."); }
     finally { setLoading(false); }
   }

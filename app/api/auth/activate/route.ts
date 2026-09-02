@@ -5,6 +5,19 @@ export async function POST(request: Request) {
   const normalizedEmail = email.trim().toLowerCase();
   if (password.length < 8) return json({ error: "A senha deve ter pelo menos 8 caracteres." }, 400);
   await ensureDatabase();
+  const admin = await runtime.DB.prepare(
+    "SELECT id, name, email, password_hash FROM admins WHERE lower(email) = ? LIMIT 1",
+  ).bind(normalizedEmail).first<{ id: string; name: string; email: string; password_hash: string | null }>();
+
+  if (admin) {
+    if (admin.password_hash) return json({ error: "Sua senha já foi definida. Use a tela de acesso." }, 409);
+    const passwordHash = await hashPassword(password);
+    await runtime.DB.prepare("UPDATE admins SET password_hash = ?, last_access_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(passwordHash, admin.id).run();
+    const cookie = await createSessionCookie({ role: "admin", id: admin.id, email: admin.email });
+    return json({ role: "admin", email: admin.email, name: admin.name }, 200, { "set-cookie": cookie });
+  }
+
   const student = await runtime.DB.prepare(
     "SELECT id, name, email, password_hash, expires_at FROM students WHERE lower(email) = ? LIMIT 1",
   ).bind(normalizedEmail).first<{ id: string; name: string; email: string; password_hash: string | null; expires_at: string }>();

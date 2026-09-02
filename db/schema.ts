@@ -16,6 +16,18 @@ export const students = sqliteTable("students", {
   index("idx_students_expires_at").on(table.expiresAt),
 ]);
 
+export const admins = sqliteTable("admins", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull().default(""),
+  passwordHash: text("password_hash"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastAccessAt: text("last_access_at"),
+}, (table) => [
+  uniqueIndex("idx_admins_email").on(table.email),
+]);
+
 export const expirationNotices = sqliteTable("expiration_notices", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   studentId: text("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),

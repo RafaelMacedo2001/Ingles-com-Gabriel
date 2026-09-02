@@ -12,6 +12,18 @@ export async function POST(request: Request) {
   }
 
   await ensureDatabase();
+  const admin = await runtime.DB.prepare(
+    "SELECT id, name, email, password_hash FROM admins WHERE lower(email) = ? LIMIT 1",
+  ).bind(normalizedEmail).first<{ id: string; name: string; email: string; password_hash: string | null }>();
+
+  if (admin) {
+    if (!admin.password_hash) return json({ needsActivation: true, email: admin.email }, 409);
+    if (!(await verifyPassword(password, admin.password_hash))) return json({ error: "Credenciais inválidas." }, 401);
+    await runtime.DB.prepare("UPDATE admins SET last_access_at = CURRENT_TIMESTAMP WHERE id = ?").bind(admin.id).run();
+    const cookie = await createSessionCookie({ role: "admin", id: admin.id, email: admin.email });
+    return json({ role: "admin", email: admin.email, name: admin.name }, 200, { "set-cookie": cookie });
+  }
+
   const student = await runtime.DB.prepare(
     "SELECT id, name, email, password_hash, expires_at FROM students WHERE lower(email) = ? LIMIT 1",
   ).bind(normalizedEmail).first<{ id: string; name: string; email: string; password_hash: string | null; expires_at: string }>();

@@ -1,5 +1,5 @@
 import { sendStudentInvitation } from "../../../lib/invitations";
-import { ensureDatabase, getServiceConfig, json, runtime } from "../../../lib/server";
+import { ensureDatabase, getServiceConfig, json, oneYearFromNow, runtime } from "../../../lib/server";
 
 type MercadoPagoPayment = {
   id: number;
@@ -29,13 +29,6 @@ async function validWebhookSignature(request: Request, secret: string, dataId: s
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const expected = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest)));
   return expected.length === parts.v1.length && expected.split("").every((char, index) => char === parts.v1[index]);
-}
-
-function oneYearFromNow() {
-  const expiresAt = new Date();
-  expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);
-  expiresAt.setUTCHours(23, 59, 59, 0);
-  return expiresAt.toISOString();
 }
 
 export async function POST(request: Request) {

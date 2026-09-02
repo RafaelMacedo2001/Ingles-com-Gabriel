@@ -1,12 +1,5 @@
-import { ensureDatabase, json, requireRole, runtime } from "../../lib/server";
+import { ensureDatabase, json, normalizePhone, requireRole, runtime } from "../../lib/server";
 import { sendStudentInvitation } from "../../lib/invitations";
-
-function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 10 || digits.length === 11) return `+55${digits}`;
-  if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) return `+${digits}`;
-  return digits.length >= 10 && digits.length <= 15 ? `+${digits}` : "";
-}
 
 export async function GET(request: Request) {
   if (!(await requireRole(request, "admin"))) return json({ error: "Não autorizado." }, 401);
