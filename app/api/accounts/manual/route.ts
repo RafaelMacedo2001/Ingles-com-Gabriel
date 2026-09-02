@@ -1,5 +1,5 @@
 import { sendAccountInvitation } from "../../../lib/invitations";
-import { ensureDatabase, json, normalizePhone, oneYearFromNow, requireRole, runtime } from "../../../lib/server";
+import { ensureDatabase, hashPassword, json, normalizePhone, oneYearFromNow, requireRole, runtime } from "../../../lib/server";
 
 type ManualAccountPayload = {
   role?: "student" | "admin";
@@ -8,6 +8,7 @@ type ManualAccountPayload = {
   fullName?: string;
   email?: string;
   phone?: string;
+  password?: string;
   expiresAt?: string;
   sendInvite?: boolean;
 };
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
   const name = String(payload.name || payload.fullName || "").trim();
   const email = String(payload.email || "").trim().toLowerCase();
   const phone = normalizePhone(String(payload.phone || ""));
+  const password = String(payload.password || "");
   const sendInvite = payload.sendInvite !== false;
 
   if (!role) return json({ error: "Informe role como 'student'/'aluno' ou 'admin'/'gestor'." }, 400);
@@ -44,32 +46,34 @@ export async function POST(request: Request) {
 
   if (role === "admin") {
     const id = crypto.randomUUID();
+    const passwordHash = password ? await hashPassword(password) : null;
     try {
-      await runtime.DB.prepare("INSERT INTO admins (id, name, email, phone) VALUES (?, ?, ?, ?)")
-        .bind(id, name, email, phone).run();
+      await runtime.DB.prepare("INSERT INTO admins (id, name, email, phone, password_hash) VALUES (?, ?, ?, ?, ?)")
+        .bind(id, name, email, phone, passwordHash).run();
     } catch {
       return json({ error: "Já existe um gestor com este e-mail." }, 409);
     }
 
-    const invitation = sendInvite
+    const invitation = sendInvite && !passwordHash
       ? await sendAccountInvitation(request, { role, name, email })
-      : { sent: false, reason: "Envio de convite desativado para esta requisição." };
+      : { sent: false, reason: passwordHash ? "Conta criada com senha definida." : "Envio de convite desativado para esta requisição." };
 
-    return json({ id, role, name, email, phone, activated: false, invitationSent: invitation.sent, invitationMessage: invitation.reason }, 201);
+    return json({ id, role, name, email, phone, activated: Boolean(passwordHash), invitationSent: invitation.sent, invitationMessage: invitation.reason }, 201);
   }
 
   const expiresAt = payload.expiresAt || oneYearFromNow();
   const id = crypto.randomUUID();
+  const passwordHash = password ? await hashPassword(password) : null;
   try {
-    await runtime.DB.prepare("INSERT INTO students (id, name, email, phone, expires_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(id, name, email, phone, expiresAt).run();
+    await runtime.DB.prepare("INSERT INTO students (id, name, email, phone, password_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, name, email, phone, passwordHash, expiresAt).run();
   } catch {
     return json({ error: "Já existe um aluno com este e-mail." }, 409);
   }
 
-  const invitation = sendInvite
+  const invitation = sendInvite && !passwordHash
     ? await sendAccountInvitation(request, { role, name, email, expiresAt })
-    : { sent: false, reason: "Envio de convite desativado para esta requisição." };
+    : { sent: false, reason: passwordHash ? "Conta criada com senha definida." : "Envio de convite desativado para esta requisição." };
 
-  return json({ id, role, name, email, phone, expiresAt, activated: false, invitationSent: invitation.sent, invitationMessage: invitation.reason }, 201);
+  return json({ id, role, name, email, phone, expiresAt, activated: Boolean(passwordHash), invitationSent: invitation.sent, invitationMessage: invitation.reason }, 201);
 }
